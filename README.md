@@ -154,3 +154,58 @@ run against a real schedule.
 Fill in the résumé bullet in `../PROJECT-1-scheduled-pipeline.md` with real
 numbers once it's actually been run for a while — specific numbers are what
 make the bullet invite a good conversation instead of getting skimmed.
+
+---
+
+## What I'd do differently
+
+**The digest-logging bug, and what it says about testing mailers.** An
+earlier version unconditionally logged `digest_sent` after calling
+`mailer.send()`, regardless of which mailer handled it — so a run with
+`MAILER=none` would claim a digest was "sent" when nothing actually left
+the building. Both `NullMailer.send()` and `GraphMailer.send()` now return
+a `bool` for whether mail actually went out, and `run.py` picks the log
+event (`digest_sent` vs. `digest_logged_only`) from that return value
+instead of assuming success. The lesson generalizes: a "safe default" mailer
+that silently no-ops is exactly the kind of code path that needs its own
+explicit test, because it fails by *looking* like it worked, not by
+crashing.
+
+**`MAILER` has never been proven end-to-end.** Every real run so far —
+local dev and the live scheduled workflow — has used `MAILER=none`. The
+Graph code path (OAuth2 client-credentials flow, `sendMail` call) has never
+actually sent an email against a real tenant. It's the one acceptance
+criterion in the parent spec ("digest email... sent") that's still purely
+theoretical; the code is written and the digest-selection logic is
+unit-testable, but nothing has verified it against the real Graph API.
+
+**SQLite is fine for development, but production should be Postgres from
+day one.** The upsert logic is dialect-agnostic and the test suite exercises
+both, but SQLite's single-writer locking model doesn't hold up well against
+a scheduled job that might overlap with a manual backfill or a second
+concurrent trigger — the kind of scenario the "why a rerun and a crash are
+both safe" section above assumes is merely wasteful, not actively blocking.
+If this ran unattended in the cloud, `DATABASE_URL` should point at
+Postgres before the first scheduled run, not after the first lock-contention
+incident.
+
+**The GitHub Actions `working-directory` mismatch.** The original workflow
+template set `defaults.run.working-directory: project-1-scheduled-pipeline`,
+written on the assumption that the repo root would be a parent
+`meridian-portfolio` monorepo with each project in its own subdirectory.
+Since this project is actually its own standalone repo, the repo root
+already *is* the project root — that line pointed at a directory that
+didn't exist, and every step after checkout would have failed. It never
+ran, because the mismatch was caught before the workflow's first trigger,
+but it's a reminder that a deploy template copied from a "what if we
+restructure later" assumption needs to be checked against the actual repo
+layout, not just against how the docs describe it.
+
+**The initial commit is a single large snapshot, not a history.**
+`RESUME-AND-INTERVIEW.md` (in the parent portfolio repo) is explicit that
+incremental commits with real messages tell a better story than one big
+"initial commit" — and this repo's first commit is exactly that pattern:
+the whole pipeline, tests, and docs landed in one commit. Everything since
+(the workflow, the heartbeat wiring, these README updates) has been
+incremental, which is the right shape going forward, but it doesn't undo
+how the repo's history opens for anyone who reads it top to bottom.
