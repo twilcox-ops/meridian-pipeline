@@ -36,7 +36,7 @@ jobs:
       - name: Run pipeline
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          MAILER: graph
+          MAILER: none
           DIGEST_TO: ${{ secrets.DIGEST_TO }}
           DIGEST_FROM: ${{ secrets.DIGEST_FROM }}
           GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
