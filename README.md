@@ -144,11 +144,11 @@ to the point where all of these are true *once deployed and run*; none of
 them are true just by cloning this repo — they require an actual multi-day
 run against a real schedule.
 
-- [ ] Ran on schedule, unattended, for at least seven consecutive days
+- [ ] Ran on schedule, unattended, for at least seven consecutive days — schedule is live as of 2026-08-17; clock has started, not yet at seven days
 - [x] Re-running any single window is a no-op on row counts — `tests/test_idempotency.py`
 - [x] Killing the job halfway leaves the database consistent — see "Why a rerun and a crash are both safe" above
 - [x] `git log -p | grep -i "key\|secret\|password"` returns nothing meaningful — verified: only matches are variable names/refs (`secrets.DATABASE_URL`, empty `GRAPH_CLIENT_SECRET=` placeholder in `.env.example`) and prose mentioning Key Vault, no actual credential values
-- [ ] Alert on the job failing to run at all, not just erroring — see `deploy/README.md`'s heartbeat/absence-alert section; requires the external monitor to actually be wired up
+- [x] Alert on the job failing to run at all, not just erroring — healthchecks.io dead-man's-switch is wired up and active; the workflow pings it on success, healthchecks.io alerts if a ping is missed
 - [x] This README explains the schema and the natural-key choice
 
 Fill in the résumé bullet in `../PROJECT-1-scheduled-pipeline.md` with real
