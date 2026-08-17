@@ -1,0 +1,56 @@
+# Simpler alternative to Container Apps Jobs — no cloud subscription needed,
+# good for actually proving out "ran unattended for seven days" cheaply.
+# Copy to .github/workflows/earthquake-pipeline.yml at the repo root to use.
+#
+# Real gotcha worth knowing for the "how would you know if this broke?"
+# question: GitHub disables scheduled workflows automatically after 60 days
+# of *repository* inactivity (not workflow inactivity) — a genuinely common
+# way for a "working" pipeline to go silent with no error anywhere. The
+# heartbeat step below is what catches that: it pings an external dead-man's
+# switch (e.g. healthchecks.io's free tier) only on success, and that
+# service — not this workflow — is what alerts on the run simply not
+# happening.
+name: earthquake-pipeline
+
+on:
+  schedule:
+    - cron: "17 * * * *" # hourly, offset from :00 to avoid the top-of-hour pile-up
+  workflow_dispatch:
+    inputs:
+      backfill_start:
+        description: "ISO 8601 start (optional backfill)"
+        required: false
+      backfill_end:
+        description: "ISO 8601 end (optional backfill)"
+        required: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: project-1-scheduled-pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install .[postgres]
+      - name: Run pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MAILER: graph
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+          DIGEST_FROM: ${{ secrets.DIGEST_FROM }}
+          GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+          GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+          GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+        run: |
+          if [ -n "${{ github.event.inputs.backfill_start }}" ]; then
+            python -m pipeline.run --backfill-start "${{ github.event.inputs.backfill_start }}" --backfill-end "${{ github.event.inputs.backfill_end }}"
+          else
+            python -m pipeline.run
+          fi
+      - name: Ping dead-man's-switch heartbeat on success
+        if: success()
+        run: curl -fsS "${{ secrets.HEARTBEAT_URL }}" || true

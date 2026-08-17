@@ -1,0 +1,29 @@
+[project]
+name = "meridian-earthquake-pipeline"
+version = "0.1.0"
+description = "Scheduled ingestion pipeline: USGS earthquakes -> Postgres/SQLite, with idempotent upserts, watermark-based incremental fetch, retry with backoff, and an email digest."
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+    "tenacity>=8.2",
+    "SQLAlchemy>=2.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg2-binary>=2.9"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+run-pipeline = "pipeline.run:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
