@@ -109,6 +109,12 @@ sending it, so the pipeline runs end-to-end with zero external
 configuration beyond a database. Set `MAILER=graph` plus the `GRAPH_*`
 variables to actually send mail — see `src/pipeline/digest.py`.
 
+The scheduled workflow in `.github/workflows/earthquake-pipeline.yml` also
+currently runs with `MAILER=none`, so the "digest email" acceptance
+criterion isn't actually being exercised by the live schedule yet — that
+needs the `GRAPH_*` secrets added and `MAILER` flipped to `graph` in the
+workflow before it's proven end-to-end.
+
 ---
 
 ## Layout
@@ -123,7 +129,10 @@ src/pipeline/
 ├── logging_setup.py        # JSON-lines structured logging
 └── run.py                    # CLI: scheduled / --dry-run / --backfill-*
 tests/                          # idempotency, upsert, watermark — see test docstrings
-deploy/                          # Dockerfile, Container Apps Jobs bicep, GitHub Actions alternative
+deploy/                          # Dockerfile, Container Apps Jobs bicep, GitHub Actions template
+.github/workflows/               # earthquake-pipeline.yml — the active scheduled workflow (copied
+                                  # from deploy/github-actions-schedule.yml; currently runs with
+                                  # MAILER=none until Graph credentials are added, see below)
 ```
 
 ---
@@ -138,7 +147,7 @@ run against a real schedule.
 - [ ] Ran on schedule, unattended, for at least seven consecutive days
 - [x] Re-running any single window is a no-op on row counts — `tests/test_idempotency.py`
 - [x] Killing the job halfway leaves the database consistent — see "Why a rerun and a crash are both safe" above
-- [ ] `git log -p | grep -i "key\|secret\|password"` returns nothing meaningful — verify once this is its own repo with real history
+- [x] `git log -p | grep -i "key\|secret\|password"` returns nothing meaningful — verified: only matches are variable names/refs (`secrets.DATABASE_URL`, empty `GRAPH_CLIENT_SECRET=` placeholder in `.env.example`) and prose mentioning Key Vault, no actual credential values
 - [ ] Alert on the job failing to run at all, not just erroring — see `deploy/README.md`'s heartbeat/absence-alert section; requires the external monitor to actually be wired up
 - [x] This README explains the schema and the natural-key choice
 
