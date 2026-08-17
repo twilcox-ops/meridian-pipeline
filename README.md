@@ -7,6 +7,45 @@ Postgres/SQLite, and emails a digest of what's notable since the last run.
 Personal project built for skill development against a public API — no
 production deployment, no real users.
 
+```mermaid
+flowchart LR
+    Sched["Scheduler<br/>GitHub Actions cron<br/>(or Container Apps Job)"] -->|triggers| Run["pipeline.run"]
+
+    subgraph Fetch [" "]
+        direction TB
+        Fetch1["fetch.py<br/>USGS API, retry + backoff"]
+        Fetch2["query: updatedafter = watermark"]
+        Fetch1 --> Fetch2
+    end
+
+    Run --> Fetch1
+
+    subgraph Store [" "]
+        direction TB
+        DB["db.py<br/>upsert into earthquakes<br/>ON CONFLICT DO UPDATE (id)"]
+        WM["pipeline_watermark<br/>advances after commit"]
+        DB --> WM
+    end
+
+    Fetch2 --> DB
+
+    subgraph Notify [" "]
+        direction TB
+        Digest["digest.py<br/>select notable events"]
+        Mailer{"MAILER"}
+        Null["NullMailer<br/>log only"]
+        Graph["GraphMailer<br/>send via Microsoft Graph"]
+        Digest --> Mailer
+        Mailer -->|none| Null
+        Mailer -->|graph| Graph
+    end
+
+    DB --> Digest
+
+    Run -.->|on success| Heartbeat["healthchecks.io<br/>dead-man's-switch ping"]
+    Run -.-> Logs["JSON structured logs"]
+```
+
 ---
 
 ## Schema, and why the primary key is what it is
