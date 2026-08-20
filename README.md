@@ -1,8 +1,11 @@
 # Project 1 — Scheduled Cloud Ingestion Pipeline
 
-A scaffold for the project described in
-[`../PROJECT-1-scheduled-pipeline.md`](../PROJECT-1-scheduled-pipeline.md).
-Pulls earthquake events from the USGS public API, upserts them into
+Proves you can build something that runs unattended in the cloud for weeks
+without anyone touching it — the same fetch/reconcile/store/notify pattern
+nearly all business automation reduces to. A scaffold for the project
+described in
+[`../PROJECT-1-scheduled-pipeline.md`](../PROJECT-1-scheduled-pipeline.md):
+pulls earthquake events from the USGS public API, upserts them into
 Postgres/SQLite, and emails a digest of what's notable since the last run.
 Personal project built for skill development against a public API — no
 production deployment, no real users.
