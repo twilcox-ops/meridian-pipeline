@@ -146,6 +146,20 @@ python -m pipeline.run                        # real run: fetch, upsert, maybe s
 python -m pipeline.run --backfill-start 2026-08-01T00:00:00 --backfill-end 2026-08-08T00:00:00
 ```
 
+**Windows note:** `py -m venv .venv` above can fail with
+`CommandNotFoundException` if neither `py` nor `python` is on `PATH` —
+confirmed by a clean-clone test on this machine, where `where.exe python`
+found nothing at all (no stub, no interpreter, no match). A working
+interpreter may still exist at `%LOCALAPPDATA%\Microsoft\WindowsApps\` (or
+wherever the Python Install Manager / python.org installer placed it) even
+though it's missing from `PATH` — check there directly. The fix is either to
+add that directory to `PATH`, or to invoke venv creation with the
+interpreter's full path, e.g. `& "C:\path\to\python.exe" -m venv .venv`.
+This is a **different root cause** than Project 2's README's Windows note:
+that one is a non-functional `WindowsApps` app-execution-alias stub that
+redirects to the Store instead of running Python; this one is a real,
+working interpreter that's simply missing from `PATH`.
+
 `MAILER=none` (the `.env.example` default) logs the digest instead of
 sending it, so the pipeline runs end-to-end with zero external
 configuration beyond a database. Set `MAILER=graph` plus the `GRAPH_*`
@@ -188,7 +202,7 @@ run against a real schedule.
 
 - [ ] Ran on schedule, unattended, for at least seven consecutive days — schedule is live as of 2026-08-17; clock has started, not yet at seven days
 - [x] Re-running any single window is a no-op on row counts — `tests/test_idempotency.py`
-- [x] Killing the job halfway leaves the database consistent — see "Why a rerun and a crash are both safe" above
+- [x] Killing the job halfway leaves the database consistent, and the next run recovers — `tests/test_crash_recovery.py` forces a real mid-batch exception (a verified `ROLLBACK`, not a hand-simulated failure) and confirms zero partial rows land, then that a rerun of the same batch fully recovers; see "Why a rerun and a crash are both safe" above. Caveat: this proves transaction-rollback atomicity, not a literal OS-level process kill — strong evidence for the claim, not an identical reproduction of it.
 - [x] `git log -p | grep -i "key\|secret\|password"` returns nothing meaningful — verified: only matches are variable names/refs (`secrets.DATABASE_URL`, empty `GRAPH_CLIENT_SECRET=` placeholder in `.env.example`) and prose mentioning Key Vault, no actual credential values
 - [x] Alert on the job failing to run at all, not just erroring — healthchecks.io dead-man's-switch is wired up and active; the workflow pings it on success, healthchecks.io alerts if a ping is missed
 - [x] This README explains the schema and the natural-key choice
