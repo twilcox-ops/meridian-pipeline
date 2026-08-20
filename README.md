@@ -173,6 +173,12 @@ sending it, so the pipeline runs end-to-end with zero external
 configuration beyond a database. Set `MAILER=graph` plus the `GRAPH_*`
 variables to actually send mail — see `src/pipeline/digest.py`.
 
+The digest is only built and sent when notable records exist — enforced by
+`if notable and not args.dry_run` in `run.py:109`, not by `digest.py`
+itself. `digest.py`'s own functions (`build_digest_html`, `NullMailer.send`,
+`GraphMailer.send`) don't independently guard against empty input; that
+invariant is enforced by the caller.
+
 The scheduled workflow in `.github/workflows/earthquake-pipeline.yml` also
 currently runs with `MAILER=none`, so the "digest email" acceptance
 criterion isn't actually being exercised by the live schedule yet — that
