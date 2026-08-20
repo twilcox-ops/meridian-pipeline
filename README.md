@@ -49,6 +49,14 @@ flowchart LR
     Run -.-> Logs["JSON structured logs"]
 ```
 
+**Retry and logging, spelled out beyond the diagram labels:** `_get_page()`
+retries transient USGS failures (HTTP 429/5xx, connection errors, timeouts)
+up to 3 attempts total, with exponential backoff plus jitter starting at 1s
+and capping at 20s (`tenacity.stop_after_attempt(3)`,
+`wait_exponential_jitter(initial=1, max=20)` — `src/pipeline/fetch.py:54-58`).
+Every run emits a `run_complete` JSON log line with `fetched`, `inserted`,
+`updated`, `skipped`, and `duration_seconds` (`src/pipeline/run.py:86-97`).
+
 ---
 
 ## Schema, and why the primary key is what it is
