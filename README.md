@@ -221,6 +221,7 @@ run against a real schedule.
 - [x] Secrets from a vault, retrieved with a managed identity (spec `Requirements`) — met at the scope this project actually calls for: GitHub Actions repo secrets is appropriate for a personal project at this scale; Key Vault + managed identity is the right call once a deployment is enterprise-scale, not before. That's a scoping decision, not a claim that GitHub Actions secrets and Key Vault are technically equivalent security models — they aren't. The schedule that's actually running pulls secrets from GitHub Actions repo secrets. Key Vault + managed identity is implemented in the `deploy/container-apps-job.bicep` / `deploy/README.md` path as the scope-appropriate choice for a larger deployment, not because it's required at this project's scale.
 - [x] Alert on the job failing to run at all, not just erroring — healthchecks.io dead-man's-switch is wired up and active; the workflow pings it on success, healthchecks.io alerts if a ping is missed
 - [x] This README explains the schema and the natural-key choice
+- [x] Digest email actually sent via the Graph API (parent spec: "digest email... sent") — proven in a manual run outside this repo's dev environment: `MAILER=graph` with real `GRAPH_*`/`DIGEST_TO` values produced a `digest_sent` log event, no error, and (per the user who ran it) a confirmed-received email; see "The Graph mailer has been proven end-to-end" below. The live scheduled workflow still defaults to `MAILER=none`, so this is proof the capability works, not that the schedule sends digests automatically.
 
 Fill in the résumé bullet in `../PROJECT-1-scheduled-pipeline.md` with real
 numbers once it's actually been run for a while — specific numbers are what
@@ -242,13 +243,21 @@ that silently no-ops is exactly the kind of code path that needs its own
 explicit test, because it fails by *looking* like it worked, not by
 crashing.
 
-**`MAILER` has never been proven end-to-end.** Every real run so far —
-local dev and the live scheduled workflow — has used `MAILER=none`. The
-Graph code path (OAuth2 client-credentials flow, `sendMail` call) has never
-actually sent an email against a real tenant. It's the one acceptance
-criterion in the parent spec ("digest email... sent") that's still purely
-theoretical; the code is written and the digest-selection logic is
-unit-testable, but nothing has verified it against the real Graph API.
+**The Graph mailer has been proven end-to-end.** With real
+`GRAPH_TENANT_ID`/`GRAPH_CLIENT_ID`/`GRAPH_CLIENT_SECRET`/`DIGEST_TO` values
+in `.env` and `MAILER=graph`, a manual run — in a separate terminal session,
+outside this assistant's environment — completed the OAuth2
+client-credentials flow, called Graph's `sendMail`, and logged:
+`{"timestamp": "2026-08-20T16:12:09-0400", "level": "INFO", "message":
+"digest_sent", "notable_count": 7}`, no error or traceback. Per the user who
+ran it, the email was also confirmed received in the `DIGEST_TO` mailbox;
+that part isn't something this assistant observed directly. That settles
+the one acceptance criterion in the parent spec ("digest email... sent")
+that was previously theoretical. It doesn't mean the *schedule* sends
+digests automatically, though: the live scheduled workflow still runs with
+`MAILER=none` by default (see above), so it won't spam the mailbox on every
+hourly run — this proves the capability works, not that it's wired into the
+schedule.
 
 **SQLite is fine for development, but production should be Postgres from
 day one.** The upsert logic is dialect-agnostic and the test suite exercises
