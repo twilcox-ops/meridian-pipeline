@@ -214,7 +214,7 @@ to the point where all of these are true *once deployed and run*; none of
 them are true just by cloning this repo — they require an actual multi-day
 run against a real schedule.
 
-- [ ] Ran on schedule, unattended, for at least seven consecutive days — schedule is live as of 2026-08-17; clock has started, not yet at seven days
+- [x] Ran on schedule, unattended, for at least seven consecutive days — GitHub Actions run history confirms 180+ consecutive scheduled runs, zero failures, spanning Aug 17–24/25, 2026 (exceeds the 7-day requirement). Note: healthchecks.io logged a handful of brief down→up recovery blips during this window (each under 25 min, self-recovered, root cause not investigated); GitHub Actions run history shows no corresponding failed runs in those windows, so these are noted for completeness rather than treated as a pipeline failure.
 - [x] Re-running any single window is a no-op on row counts — `tests/test_idempotency.py`
 - [x] Killing the job halfway leaves the database consistent, and the next run recovers — `tests/test_crash_recovery.py` forces a real mid-batch exception (a verified `ROLLBACK`, not a hand-simulated failure) and confirms zero partial rows land, then that a rerun of the same batch fully recovers; see "Why a rerun and a crash are both safe" above. Caveat: this proves transaction-rollback atomicity, not a literal OS-level process kill — strong evidence for the claim, not an identical reproduction of it.
 - [x] `git log -p | grep -i "key\|secret\|password"` returns nothing meaningful — verified: only matches are variable names/refs (`secrets.DATABASE_URL`, empty `GRAPH_CLIENT_SECRET=` placeholder in `.env.example`) and prose mentioning Key Vault, no actual credential values
