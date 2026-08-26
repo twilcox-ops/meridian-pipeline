@@ -1,7 +1,7 @@
 # Project 1 — Scheduled Cloud Ingestion Pipeline
 
-Proves you can build something that runs unattended in the cloud for weeks
-without anyone touching it — the same fetch/reconcile/store/notify pattern
+Proves you can build something that runs unattended in the cloud for a week
+straight without anyone touching it — the same fetch/reconcile/store/notify pattern
 nearly all business automation reduces to. A scaffold for the project
 described in
 [`../PROJECT-1-scheduled-pipeline.md`](../PROJECT-1-scheduled-pipeline.md):
@@ -209,10 +209,11 @@ deploy/                          # Dockerfile, Container Apps Jobs bicep, GitHub
 
 ## Acceptance criteria
 
-Tracking against `../PROJECT-1-scheduled-pipeline.md`. The scaffold gets you
-to the point where all of these are true *once deployed and run*; none of
-them are true just by cloning this repo — they require an actual multi-day
-run against a real schedule.
+Tracking against `../PROJECT-1-scheduled-pipeline.md`. All of the items
+below are now satisfied, each with its own cited evidence (test runs, repo
+checks, the schedule's run history, or a manual proof run) — see each line
+for what specifically backs it, rather than assuming one evidence source
+covers all of them.
 
 - [x] Ran on schedule, unattended, for at least seven consecutive days — GitHub Actions run history confirms 180+ consecutive scheduled runs, zero failures, spanning Aug 17–24/25, 2026 (exceeds the 7-day requirement). Note: healthchecks.io logged a handful of brief down→up recovery blips during this window (each under 25 min, self-recovered, root cause not investigated); GitHub Actions run history shows no corresponding failed runs in those windows, so these are noted for completeness rather than treated as a pipeline failure.
 - [x] Re-running any single window is a no-op on row counts — `tests/test_idempotency.py`
@@ -223,9 +224,20 @@ run against a real schedule.
 - [x] This README explains the schema and the natural-key choice
 - [x] Digest email actually sent via the Graph API (parent spec: "digest email... sent") — proven in a manual run outside this repo's dev environment: `MAILER=graph` with real `GRAPH_*`/`DIGEST_TO` values produced a `digest_sent` log event, no error, and (per the user who ran it) a confirmed-received email; see "The Graph mailer has been proven end-to-end" below. The live scheduled workflow still defaults to `MAILER=none`, so this is proof the capability works, not that the schedule sends digests automatically.
 
-Fill in the résumé bullet in `../PROJECT-1-scheduled-pipeline.md` with real
-numbers once it's actually been run for a while — specific numbers are what
-make the bullet invite a good conversation instead of getting skimmed.
+**Filled-in résumé bullet** (see the template in
+`../PROJECT-1-scheduled-pipeline.md`):
+
+> Built a scheduled ingestion pipeline on **GitHub Actions** pulling
+> earthquake records from a public seismic API (USGS) into what the live
+> secret configuration strongly indicates is PostgreSQL, with idempotent
+> upserts, watermark-based incremental fetch, and exponential-backoff
+> retry; ran unattended for **7–8 days** (Aug 17–24/25, 2026) across
+> **180+** consecutive scheduled runs with **zero** failures.
+
+Records/day is intentionally omitted — pulling a real, verified figure
+requires either authenticated access to the workflow's job logs or a direct
+query against the production database, neither of which is available from
+this repo alone, so it isn't guessed here.
 
 ---
 
@@ -265,9 +277,14 @@ both, but SQLite's single-writer locking model doesn't hold up well against
 a scheduled job that might overlap with a manual backfill or a second
 concurrent trigger — the kind of scenario the "why a rerun and a crash are
 both safe" section above assumes is merely wasteful, not actively blocking.
-If this ran unattended in the cloud, `DATABASE_URL` should point at
-Postgres before the first scheduled run, not after the first lock-contention
-incident.
+What's actually configured, not inferred from the README's own SQLite
+default: the live GitHub Actions workflow installs the Postgres driver on
+every run (`pip install .[postgres]`,
+`.github/workflows/earthquake-pipeline.yml:35`) and pulls `DATABASE_URL`
+from a GitHub Actions secret (`secrets.DATABASE_URL`, same file, line 38) —
+not the `sqlite:///./local.db` default in `.env.example`. That strongly
+indicates Postgres in production, but the secret's literal value can't be
+read to confirm it directly.
 
 **The GitHub Actions `working-directory` mismatch.** The original workflow
 template set `defaults.run.working-directory: project-1-scheduled-pipeline`,
