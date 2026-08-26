@@ -1,14 +1,12 @@
 # Project 1 — Scheduled Cloud Ingestion Pipeline
 
 Proves you can build something that runs unattended in the cloud for a week
-straight without anyone touching it — the same fetch/reconcile/store/notify pattern
-nearly all business automation reduces to. A scaffold for the project
-described in
-[`../PROJECT-1-scheduled-pipeline.md`](../PROJECT-1-scheduled-pipeline.md):
-pulls earthquake events from the USGS public API, upserts them into
-Postgres/SQLite, and emails a digest of what's notable since the last run.
-Personal project built for skill development against a public API — no
-production deployment, no real users.
+straight without anyone touching it — the same fetch/reconcile/store/notify
+pattern nearly all business automation reduces to. Pulls earthquake events
+from the USGS public API, upserts them into Postgres/SQLite, and emails a
+digest of what's notable since the last run. Personal project built for
+skill development against a public API — no production deployment, no real
+users.
 
 ```mermaid
 flowchart LR
@@ -180,8 +178,8 @@ itself. `digest.py`'s own functions (`build_digest_html`, `NullMailer.send`,
 invariant is enforced by the caller.
 
 The scheduled workflow in `.github/workflows/earthquake-pipeline.yml` also
-currently runs with `MAILER=none`, so the "digest email" acceptance
-criterion isn't actually being exercised by the live schedule yet — that
+currently runs with `MAILER=none`, so the digest-email requirement isn't
+actually being exercised by the live schedule yet — that
 needs the `GRAPH_*` secrets added and `MAILER` flipped to `graph` in the
 workflow before it's proven end-to-end.
 
@@ -207,25 +205,23 @@ deploy/                          # Dockerfile, Container Apps Jobs bicep, GitHub
 
 ---
 
-## Acceptance criteria
+## What's proven
 
-Tracking against `../PROJECT-1-scheduled-pipeline.md`. All of the items
-below are now satisfied, each with its own cited evidence (test runs, repo
-checks, the schedule's run history, or a manual proof run) — see each line
-for what specifically backs it, rather than assuming one evidence source
-covers all of them.
+Every claim below is now satisfied, each with its own cited evidence (test
+runs, repo checks, the schedule's run history, or a manual proof run) — see
+each line for what specifically backs it, rather than assuming one evidence
+source covers all of them.
 
 - [x] Ran on schedule, unattended, for at least seven consecutive days — GitHub Actions run history confirms 180+ consecutive scheduled runs, zero failures, spanning Aug 17–24/25, 2026 (exceeds the 7-day requirement). Note: healthchecks.io logged a handful of brief down→up recovery blips during this window (each under 25 min, self-recovered, root cause not investigated); GitHub Actions run history shows no corresponding failed runs in those windows, so these are noted for completeness rather than treated as a pipeline failure.
 - [x] Re-running any single window is a no-op on row counts — `tests/test_idempotency.py`
 - [x] Killing the job halfway leaves the database consistent, and the next run recovers — `tests/test_crash_recovery.py` forces a real mid-batch exception (a verified `ROLLBACK`, not a hand-simulated failure) and confirms zero partial rows land, then that a rerun of the same batch fully recovers; see "Why a rerun and a crash are both safe" above. Caveat: this proves transaction-rollback atomicity, not a literal OS-level process kill — strong evidence for the claim, not an identical reproduction of it.
 - [x] `git log -p | grep -i "key\|secret\|password"` returns nothing meaningful — verified: only matches are variable names/refs (`secrets.DATABASE_URL`, empty `GRAPH_CLIENT_SECRET=` placeholder in `.env.example`) and prose mentioning Key Vault, no actual credential values
-- [x] Secrets from a vault, retrieved with a managed identity (spec `Requirements`) — met at the scope this project actually calls for: GitHub Actions repo secrets is appropriate for a personal project at this scale; Key Vault + managed identity is the right call once a deployment is enterprise-scale, not before. That's a scoping decision, not a claim that GitHub Actions secrets and Key Vault are technically equivalent security models — they aren't. The schedule that's actually running pulls secrets from GitHub Actions repo secrets. Key Vault + managed identity is implemented in the `deploy/container-apps-job.bicep` / `deploy/README.md` path as the scope-appropriate choice for a larger deployment, not because it's required at this project's scale.
+- [x] Secrets from a vault, retrieved with a managed identity — met at the scope this project actually calls for: GitHub Actions repo secrets is appropriate for a personal project at this scale; Key Vault + managed identity is the right call once a deployment is enterprise-scale, not before. That's a scoping decision, not a claim that GitHub Actions secrets and Key Vault are technically equivalent security models — they aren't. The schedule that's actually running pulls secrets from GitHub Actions repo secrets. Key Vault + managed identity is implemented in the `deploy/container-apps-job.bicep` / `deploy/README.md` path as the scope-appropriate choice for a larger deployment, not because it's required at this project's scale.
 - [x] Alert on the job failing to run at all, not just erroring — healthchecks.io dead-man's-switch is wired up and active; the workflow pings it on success, healthchecks.io alerts if a ping is missed
 - [x] This README explains the schema and the natural-key choice
-- [x] Digest email actually sent via the Graph API (parent spec: "digest email... sent") — proven in a manual run outside this repo's dev environment: `MAILER=graph` with real `GRAPH_*`/`DIGEST_TO` values produced a `digest_sent` log event, no error, and (per the user who ran it) a confirmed-received email; see "The Graph mailer has been proven end-to-end" below. The live scheduled workflow still defaults to `MAILER=none`, so this is proof the capability works, not that the schedule sends digests automatically.
+- [x] Digest email actually sent via the Graph API — this needed to prove an email actually left the building, not just got logged — proven in a manual run outside this repo's dev environment: `MAILER=graph` with real `GRAPH_*`/`DIGEST_TO` values produced a `digest_sent` log event, no error, and (per the user who ran it) a confirmed-received email; see "The Graph mailer has been proven end-to-end" below. The live scheduled workflow still defaults to `MAILER=none`, so this is proof the capability works, not that the schedule sends digests automatically.
 
-**Filled-in résumé bullet** (see the template in
-`../PROJECT-1-scheduled-pipeline.md`):
+In summary:
 
 > Built a scheduled ingestion pipeline on **GitHub Actions** pulling
 > earthquake records from a public seismic API (USGS) into what the live
@@ -264,8 +260,9 @@ client-credentials flow, called Graph's `sendMail`, and logged:
 "digest_sent", "notable_count": 7}`, no error or traceback. Per the user who
 ran it, the email was also confirmed received in the `DIGEST_TO` mailbox;
 that part isn't something this assistant observed directly. That settles
-the one acceptance criterion in the parent spec ("digest email... sent")
-that was previously theoretical. It doesn't mean the *schedule* sends
+the one requirement that was previously theoretical: proving a digest email
+could actually be sent via Graph, not just logged. It doesn't mean the
+*schedule* sends
 digests automatically, though: the live scheduled workflow still runs with
 `MAILER=none` by default (see above), so it won't spam the mailbox on every
 hourly run — this proves the capability works, not that it's wired into the
@@ -299,8 +296,7 @@ restructure later" assumption needs to be checked against the actual repo
 layout, not just against how the docs describe it.
 
 **The initial commit is a single large snapshot, not a history.**
-`RESUME-AND-INTERVIEW.md` (in the parent portfolio repo) is explicit that
-incremental commits with real messages tell a better story than one big
+Incremental commits with real messages tell a better story than one big
 "initial commit" — and this repo's first commit is exactly that pattern:
 the whole pipeline, tests, and docs landed in one commit. Everything since
 (the workflow, the heartbeat wiring, these README updates) has been
