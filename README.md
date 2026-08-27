@@ -134,7 +134,17 @@ timezone-aware type) and Postgres. See `src/pipeline/timeutil.py`.
   scaffold doesn't add a distributed lock on top, because the upsert already
   makes double-execution a no-op rather than a correctness problem; the
   trade-off worth knowing is that two truly simultaneous runs will each pay
-  the API/DB cost even though only one changes anything.
+  the API/DB cost even though only one changes anything. That said, the
+  watermark update itself (`complete_run`) is a plain, unconditional
+  overwrite, not a compare-and-swap against the currently stored value — so
+  if two runs genuinely overlap and finish out of order, whichever
+  `complete_run` call lands last wins, regardless of which run actually saw
+  the larger `updated_time_ms`, and the watermark can move backward. That's
+  still safe rather than lossy — a regressed watermark only makes the next
+  run re-fetch (and idempotently re-skip) a wider window than strictly
+  necessary, it can't cause an event to be missed — but it's a real gap,
+  not a theoretical one: nothing here guarantees the watermark only moves
+  forward under true concurrency.
 
 ---
 
@@ -178,10 +188,15 @@ itself. `digest.py`'s own functions (`build_digest_html`, `NullMailer.send`,
 invariant is enforced by the caller.
 
 The scheduled workflow in `.github/workflows/earthquake-pipeline.yml` also
-currently runs with `MAILER=none`, so the digest-email requirement isn't
-actually being exercised by the live schedule yet — that
-needs the `GRAPH_*` secrets added and `MAILER` flipped to `graph` in the
-workflow before it's proven end-to-end.
+runs with `MAILER=none` by design, not because Graph is unconfigured or
+unproven — the Graph send path has already been proven end-to-end in a
+manual run (see "What's proven" and "The Graph mailer has been proven
+end-to-end" below). `MAILER=none` on the schedule is a deliberate choice
+to avoid sending a real email on every hourly run; wiring `GRAPH_*`
+secrets into the workflow and flipping `MAILER` to `graph` there would
+prove that the *schedule itself* sends digests automatically — a
+separate, not-yet-exercised claim from the capability already being
+proven.
 
 ---
 
@@ -199,8 +214,8 @@ src/pipeline/
 tests/                          # idempotency, upsert, watermark — see test docstrings
 deploy/                          # Dockerfile, Container Apps Jobs bicep, GitHub Actions template
 .github/workflows/               # earthquake-pipeline.yml — the active scheduled workflow (copied
-                                  # from deploy/github-actions-schedule.yml; currently runs with
-                                  # MAILER=none until Graph credentials are added, see below)
+                                  # from deploy/github-actions-schedule.yml; runs with MAILER=none
+                                  # by design post-proof — see "Running it locally" below)
 ```
 
 ---
